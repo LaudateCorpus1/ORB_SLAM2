@@ -181,6 +181,7 @@ int ORBmatcher::SearchByBoW(KeyFrame* pKF,Frame &F, vector<MapPoint*> &vpMapPoin
     {
         if(KFit->first == Fit->first)
         {
+            //Inverse Index
             const vector<unsigned int> vIndicesKF = KFit->second;
             const vector<unsigned int> vIndicesF = Fit->second;
 
@@ -188,6 +189,7 @@ int ORBmatcher::SearchByBoW(KeyFrame* pKF,Frame &F, vector<MapPoint*> &vpMapPoin
             {
                 const unsigned int realIdxKF = vIndicesKF[iKF];
 
+                //Corresponding MP
                 MapPoint* pMP = vpMapPointsKF[realIdxKF];
 
                 if(!pMP)
@@ -404,9 +406,11 @@ int ORBmatcher::SearchByProjection(KeyFrame* pKF, cv::Mat Scw, const vector<MapP
 
 int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f> &vbPrevMatched, vector<int> &vnMatches12, int windowSize)
 {
+    // F1 feature match counter
     int nmatches=0;
     vnMatches12 = vector<int>(F1.mvKeysUn.size(),-1);
 
+    //Orientation Histogram
     vector<int> rotHist[HISTO_LENGTH];
     for(int i=0;i<HISTO_LENGTH;i++)
         rotHist[i].reserve(500);
@@ -417,22 +421,26 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
 
     for(size_t i1=0, iend1=F1.mvKeysUn.size(); i1<iend1; i1++)
     {
+        //Level check. Only match within the same level. Why not match across levels?
         cv::KeyPoint kp1 = F1.mvKeysUn[i1];
         int level1 = kp1.octave;
         if(level1>0)
             continue;
 
+        //Look for potential matches within search window around initializer keypoint at this level
         vector<size_t> vIndices2 = F2.GetFeaturesInArea(vbPrevMatched[i1].x,vbPrevMatched[i1].y, windowSize,level1,level1);
 
         if(vIndices2.empty())
             continue;
 
+        //Match to candidate with the smallest hamming distance to ORB descriptor
         cv::Mat d1 = F1.mDescriptors.row(i1);
 
         int bestDist = INT_MAX;
         int bestDist2 = INT_MAX;
         int bestIdx2 = -1;
 
+        //Find best match to F1 among candidates
         for(vector<size_t>::iterator vit=vIndices2.begin(); vit!=vIndices2.end(); vit++)
         {
             size_t i2 = *vit;
@@ -441,9 +449,11 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
 
             int dist = DescriptorDistance(d1,d2);
 
+            // Only process best match to F2
             if(vMatchedDistance[i2]<=dist)
                 continue;
 
+            //Double Threshold. Why? How do they tell if it helps?
             if(dist<bestDist)
             {
                 bestDist2=bestDist;
@@ -456,10 +466,13 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
             }
         }
 
+        // Scrutinize best match
         if(bestDist<=TH_LOW)
-        {
+        {   
+            //Double Threshold again to ensure margin
             if(bestDist<(float)bestDist2*mfNNratio)
             {
+                //Swap match
                 if(vnMatches21[bestIdx2]>=0)
                 {
                     vnMatches12[vnMatches21[bestIdx2]]=-1;
@@ -486,18 +499,22 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
 
     }
 
+    //NOTE: this is run after all features in F1 have been matched against F2
     if(mbCheckOrientation)
     {
         int ind1=-1;
         int ind2=-1;
         int ind3=-1;
 
+        //Find 3 most populated rotation bins
         ComputeThreeMaxima(rotHist,HISTO_LENGTH,ind1,ind2,ind3);
 
         for(int i=0; i<HISTO_LENGTH; i++)
         {
             if(i==ind1 || i==ind2 || i==ind3)
                 continue;
+            
+            //Remove non-maxim matches
             for(size_t j=0, jend=rotHist[i].size(); j<jend; j++)
             {
                 int idx1 = rotHist[i][j];
@@ -1653,7 +1670,7 @@ int ORBmatcher::DescriptorDistance(const cv::Mat &a, const cv::Mat &b)
 
     for(int i=0; i<8; i++, pa++, pb++)
     {
-        unsigned  int v = *pa ^ *pb;
+        unsigned  int v = *pa ^ *pb;    //XOR gives differing bit positions
         v = v - ((v >> 1) & 0x55555555);
         v = (v & 0x33333333) + ((v >> 2) & 0x33333333);
         dist += (((v + (v >> 4)) & 0xF0F0F0F) * 0x1010101) >> 24;

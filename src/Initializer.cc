@@ -55,6 +55,7 @@ bool Initializer::Initialize(const Frame &CurrentFrame, const vector<int> &vMatc
     {
         if(vMatches12[i]>=0)
         {
+            //pairs of (F1 feature idx, F2 feature idx)
             mvMatches12.push_back(make_pair(i,vMatches12[i]));
             mvbMatched1[i]=true;
         }
@@ -62,6 +63,7 @@ bool Initializer::Initialize(const Frame &CurrentFrame, const vector<int> &vMatc
             mvbMatched1[i]=false;
     }
 
+    //Number of valid matches
     const int N = mvMatches12.size();
 
     // Indices for minimum set selection
@@ -91,6 +93,7 @@ bool Initializer::Initialize(const Frame &CurrentFrame, const vector<int> &vMatc
 
             mvSets[it][j] = idx;
 
+            // Sampling w/o replacement: overwrite value at randi with last element, then trim
             vAvailableIndices[randi] = vAvailableIndices.back();
             vAvailableIndices.pop_back();
         }
@@ -98,8 +101,8 @@ bool Initializer::Initialize(const Frame &CurrentFrame, const vector<int> &vMatc
 
     // Launch threads to compute in parallel a fundamental matrix and a homography
     vector<bool> vbMatchesInliersH, vbMatchesInliersF;
-    float SH, SF;
-    cv::Mat H, F;
+    float SH, SF;   //scores for homography and fundamental matrix
+    cv::Mat H, F;   //Estimates
 
     thread threadH(&Initializer::FindHomography,this,ref(vbMatchesInliersH), ref(SH), ref(H));
     thread threadF(&Initializer::FindFundamental,this,ref(vbMatchesInliersF), ref(SF), ref(F));
@@ -582,7 +585,7 @@ bool Initializer::ReconstructH(vector<bool> &vbMatchesInliers, cv::Mat &H21, cv:
     // International Journal of Pattern Recognition and Artificial Intelligence, 1988
 
     cv::Mat invK = K.inv();
-    cv::Mat A = invK*H21*K;
+    cv::Mat A = invK*H21*K; //Calibrated Homography
 
     cv::Mat U,w,Vt,V;
     cv::SVD::compute(A,w,U,Vt,cv::SVD::FULL_UV);
@@ -594,6 +597,7 @@ bool Initializer::ReconstructH(vector<bool> &vbMatchesInliers, cv::Mat &H21, cv:
     float d2 = w.at<float>(1);
     float d3 = w.at<float>(2);
 
+    //Check for degenerate cases
     if(d1/d2<1.00001 || d2/d3<1.00001)
     {
         return false;
@@ -895,6 +899,8 @@ int Initializer::CheckRT(const cv::Mat &R, const cv::Mat &t, const vector<cv::Ke
 
     if(nGood>0)
     {
+        /* Ideally, parallax will be the same across all point
+        this is an odd threshold, as opposed to taking stats */
         sort(vCosParallax.begin(),vCosParallax.end());
 
         size_t idx = min(50,int(vCosParallax.size()-1));

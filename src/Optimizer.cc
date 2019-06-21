@@ -38,7 +38,7 @@ namespace ORB_SLAM2
 {
 
 
-void Optimizer::GlobalBundleAdjustemnt(Map* pMap, int nIterations, bool* pbStopFlag, const unsigned long nLoopKF, const bool bRobust)
+void Optimizer::GlobalBundleAdjustment(Map* pMap, int nIterations, bool* pbStopFlag, const unsigned long nLoopKF, const bool bRobust)
 {
     vector<KeyFrame*> vpKFs = pMap->GetAllKeyFrames();
     vector<MapPoint*> vpMP = pMap->GetAllMapPoints();
@@ -368,12 +368,12 @@ int Optimizer::PoseOptimization(Frame *pFrame)
     // At the next optimization, outliers are not included, but at the end they can be classified as inliers again.
     const float chi2Mono[4]={5.991,5.991,5.991,5.991};
     const float chi2Stereo[4]={7.815,7.815,7.815, 7.815};
-    const int its[4]={10,10,10,10};    
+    const int its[4]={10,10,10,10}; //FREE PARAM   
 
     int nBad=0;
     for(size_t it=0; it<4; it++)
     {
-
+        //Resets Vertex Pose
         vSE3->setEstimate(Converter::toSE3Quat(pFrame->mTcw));
         optimizer.initializeOptimization(0);
         optimizer.optimize(its[it]);
@@ -385,13 +385,15 @@ int Optimizer::PoseOptimization(Frame *pFrame)
 
             const size_t idx = vnIndexEdgeMono[i];
 
+            //All points start as Inliers...
             if(pFrame->mvbOutlier[idx])
             {
                 e->computeError();
             }
 
-            const float chi2 = e->chi2();
+            const float chi2 = e->chi2();   //Mahalanobis distance as a function of pose
 
+            //...this is the first opportunity for them to be labeled outliers
             if(chi2>chi2Mono[it])
             {                
                 pFrame->mvbOutlier[idx]=true;
@@ -404,6 +406,7 @@ int Optimizer::PoseOptimization(Frame *pFrame)
                 e->setLevel(0);
             }
 
+            //Run non-Robust Kernel? Super hacky...
             if(it==2)
                 e->setRobustKernel(0);
         }

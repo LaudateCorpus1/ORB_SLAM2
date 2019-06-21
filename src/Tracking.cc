@@ -457,7 +457,7 @@ void Tracking::Track()
             if(NeedNewKeyFrame())
                 CreateNewKeyFrame();
 
-            // We allow points with high innovation (considererd outliers by the Huber Function)
+            // We allow points with high innovation (considered outliers by the Huber Function)
             // pass to the new keyframe, so that bundle adjustment will finally decide
             // if they are outliers or not. We don't want next frame to estimate its position
             // with those points so we discard them in the frame.
@@ -570,7 +570,7 @@ void Tracking::MonocularInitialization()
         {
             mInitialFrame = Frame(mCurrentFrame);
             mLastFrame = Frame(mCurrentFrame);
-            mvbPrevMatched.resize(mCurrentFrame.mvKeysUn.size());
+            mvbPrevMatched.resize(mCurrentFrame.mvKeysUn.size());   //NOTE: these aren't matched keypoints
             for(size_t i=0; i<mCurrentFrame.mvKeysUn.size(); i++)
                 mvbPrevMatched[i]=mCurrentFrame.mvKeysUn[i].pt;
 
@@ -613,6 +613,7 @@ void Tracking::MonocularInitialization()
 
         if(mpInitializer->Initialize(mCurrentFrame, mvIniMatches, Rcw, tcw, mvIniP3D, vbTriangulated))
         {
+            // Eliminate feature matches that could not be triangulated
             for(size_t i=0, iend=mvIniMatches.size(); i<iend;i++)
             {
                 if(mvIniMatches[i]>=0 && !vbTriangulated[i])
@@ -657,14 +658,18 @@ void Tracking::CreateInitialMapMonocular()
         //Create MapPoint.
         cv::Mat worldPos(mvIniP3D[i]);
 
+        //ERROR? Should the Reference frame be pKFini? 
+        // This is the frame in which the 3D point is registered
         MapPoint* pMP = new MapPoint(worldPos,pKFcur,mpMap);
 
+        // Link KF to MP and MP to KF using the same matched Feature indices
         pKFini->AddMapPoint(pMP,i);
         pKFcur->AddMapPoint(pMP,mvIniMatches[i]);
 
         pMP->AddObservation(pKFini,i);
         pMP->AddObservation(pKFcur,mvIniMatches[i]);
 
+        // Update stats for median Obs and viewing norm
         pMP->ComputeDistinctiveDescriptors();
         pMP->UpdateNormalAndDepth();
 
@@ -683,7 +688,7 @@ void Tracking::CreateInitialMapMonocular()
     // Bundle Adjustment
     cout << "New Map created with " << mpMap->MapPointsInMap() << " points" << endl;
 
-    Optimizer::GlobalBundleAdjustemnt(mpMap,20);
+    Optimizer::GlobalBundleAdjustment(mpMap,20);
 
     // Set median depth to 1
     float medianDepth = pKFini->ComputeSceneMedianDepth(2);
@@ -795,7 +800,7 @@ bool Tracking::TrackReferenceKeyFrame()
         }
     }
 
-    return nmatchesMap>=10;
+    return nmatchesMap>=10; //FREE PARAM
 }
 
 void Tracking::UpdateLastFrame()
