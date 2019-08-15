@@ -431,7 +431,7 @@ void LoopClosing::CorrectLoop()
     // Ensure current keyframe is updated
     mpCurrentKF->UpdateConnections();
 
-    // Retrive keyframes connected to the current keyframe and compute corrected Sim3 pose by propagation
+    // Retreive keyframes connected to the current keyframe and compute corrected Sim3 pose by propagation
     mvpCurrentConnectedKFs = mpCurrentKF->GetVectorCovisibleKeyFrames();
     mvpCurrentConnectedKFs.push_back(mpCurrentKF);
 
